@@ -20,7 +20,8 @@ function asBytes(value: BytesLike, encoding: "utf8" | "hex"): Uint8Array {
 }
 
 async function sha256(...values: readonly Uint8Array[]): Promise<Uint8Array> {
-  const digest = await subtleCrypto().digest("SHA-256", concatBytes(...values));
+  const input = Uint8Array.from(concatBytes(...values));
+  const digest = await subtleCrypto().digest("SHA-256", input.buffer);
   return new Uint8Array(digest);
 }
 
