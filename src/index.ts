@@ -15,8 +15,11 @@ export {
   assertMinimumTransactionFee,
 } from "./utils/amount.js";
 export {
+  accountIdToAddress,
+  addressToAccountId,
   assertAccountIdentifier,
   isNumericAccountId,
+  isValidArkoviaAddress,
   looksLikeArkoviaAddress,
 } from "./utils/account.js";
 export type * from "./types.js";

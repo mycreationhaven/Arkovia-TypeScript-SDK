@@ -1,22 +1,45 @@
+import {
+  decodeReedSolomon,
+  encodeReedSolomon,
+  isValidReedSolomon,
+} from "./reedSolomon.js";
+
 const NUMERIC_ACCOUNT = /^\d{1,20}$/;
-const ARKOVIA_RS_ACCOUNT = /^ARK-(?:[2-9A-HJ-NP-Z]{4}-){3}[2-9A-HJ-NP-Z]{5}$/;
+const MAX_ACCOUNT_ID = (1n << 64n) - 1n;
 
 export function isNumericAccountId(value: string): boolean {
-  return NUMERIC_ACCOUNT.test(value.trim());
+  const normalized = value.trim();
+  if (!NUMERIC_ACCOUNT.test(normalized)) return false;
+  try {
+    return BigInt(normalized) <= MAX_ACCOUNT_ID;
+  } catch {
+    return false;
+  }
 }
 
-/**
- * Performs a format check only. Reed-Solomon checksum verification will be
- * added with the local transaction-signing module.
- */
+export function isValidArkoviaAddress(value: string): boolean {
+  return isValidReedSolomon(value, "ARK");
+}
+
+/** @deprecated Use isValidArkoviaAddress for full checksum validation. */
 export function looksLikeArkoviaAddress(value: string): boolean {
-  return ARKOVIA_RS_ACCOUNT.test(value.trim().toUpperCase());
+  return isValidArkoviaAddress(value);
+}
+
+export function accountIdToAddress(accountId: string | bigint): string {
+  return encodeReedSolomon(accountId, "ARK");
+}
+
+export function addressToAccountId(address: string): string {
+  return decodeReedSolomon(address, "ARK");
 }
 
 export function assertAccountIdentifier(value: string): string {
   const normalized = value.trim().toUpperCase();
-  if (!isNumericAccountId(normalized) && !looksLikeArkoviaAddress(normalized)) {
-    throw new TypeError("Expected an ARK- address or numeric Arkovia account ID.");
+  if (!isNumericAccountId(normalized) && !isValidArkoviaAddress(normalized)) {
+    throw new TypeError(
+      "Expected a checksum-valid ARK- address or unsigned 64-bit account ID.",
+    );
   }
   return normalized;
 }

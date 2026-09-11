@@ -111,6 +111,22 @@ Arkovia uses eight decimal places:
 - `1 ARKOS = 100,000,000` atomic units
 - Minimum transaction fee: `0.01 ARKOS = 1,000,000` atomic units
 
+## Account addresses
+
+```ts
+import {
+  accountIdToAddress,
+  addressToAccountId,
+  isValidArkoviaAddress,
+} from "@arkovia/sdk";
+
+const address = accountIdToAddress("1739068987193023818");
+const accountId = addressToAccountId(address);
+const valid = isValidArkoviaAddress(address);
+```
+
+Address decoding performs the complete Reed–Solomon checksum validation used by Arkovia. Numeric account IDs are restricted to the unsigned 64-bit range.
+
 ## API methods
 
 ### Network and blocks
@@ -162,7 +178,7 @@ npm run build
 - [x] BigInt-safe ARKOS utilities
 - [x] Account format helpers
 - [x] Minting-target lookup
-- [ ] Full Reed-Solomon address checksum validation
+- [x] Full Reed-Solomon address checksum validation
 - [ ] Transaction byte construction
 - [ ] Secure local transaction signing
 - [ ] Transaction broadcasting
