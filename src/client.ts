@@ -407,6 +407,221 @@ export class ArkoviaClient {
     };
   }
 
+  private async prepareMonetaryTransaction(
+    requestType: string,
+    subtype: number,
+    secretPhrase: string,
+    params: Record<string, ArkoviaParam>,
+    intentAttachment: Partial<Parameters<typeof verifyUnsignedTransaction>[1]>,
+    feeArkos: string | number = "0.01",
+    deadline = 1440,
+    options?: RequestOptions,
+  ): Promise<PreparedTransaction> {
+    const feeNQT = assertMinimumTransactionFee(feeArkos).toString();
+    const publicKey = await getPublicKey(secretPhrase);
+    const response = await this.request<UnsignedTransactionResponse>(
+      requestType,
+      { ...params, feeNQT, deadline, publicKey, broadcast: false },
+      options,
+    );
+    if (!response.unsignedTransactionBytes) {
+      throw new ArkoviaError("Node did not return unsigned transaction bytes.", {
+        response,
+      });
+    }
+    verifyUnsignedTransaction(response.unsignedTransactionBytes, {
+      type: 5,
+      subtype,
+      senderPublicKey: publicKey,
+      recipient: "0",
+      amountNQT: "0",
+      feeNQT,
+      deadline,
+      ...intentAttachment,
+    });
+    return {
+      unsignedTransactionBytes: response.unsignedTransactionBytes,
+      ...(response.transactionJSON ? { transactionJSON: response.transactionJSON } : {}),
+    };
+  }
+
+  private async signAndBroadcast(
+    prepared: PreparedTransaction,
+    secretPhrase: string,
+    options?: RequestOptions,
+  ): Promise<SubmittedTransaction> {
+    const signed = await signTransactionBytes(
+      prepared.unsignedTransactionBytes,
+      secretPhrase,
+    );
+    const broadcast = await this.broadcastTransaction(signed.transactionBytes, options);
+    if (broadcast.transaction !== signed.transactionId || broadcast.fullHash !== signed.fullHash) {
+      throw new ArkoviaError(
+        "Broadcast response did not match the locally calculated transaction identity.",
+        { response: broadcast },
+      );
+    }
+    return {
+      transaction: broadcast.transaction,
+      fullHash: broadcast.fullHash,
+      transactionBytes: signed.transactionBytes,
+      locallyCalculatedTransaction: signed.transactionId,
+      locallyCalculatedFullHash: signed.fullHash,
+    };
+  }
+
+  prepareCurrencyBuy(input: {
+    secretPhrase: string;
+    currency: string;
+    rateNQT: string | number | bigint;
+    units: string | number | bigint;
+    feeArkos?: string | number;
+    deadline?: number;
+  }, options?: RequestOptions): Promise<PreparedTransaction> {
+    const currency = BigInt(input.currency).toString();
+    const rateNQT = BigInt(input.rateNQT).toString();
+    const units = BigInt(input.units).toString();
+    if (BigInt(rateNQT) <= 0n || BigInt(units) <= 0n) {
+      throw new RangeError("Exchange rate and units must be positive.");
+    }
+    return this.prepareMonetaryTransaction(
+      "currencyBuy", 5, input.secretPhrase,
+      { currency, rateNQT, units },
+      { currency, rateNQT, units },
+      input.feeArkos, input.deadline, options,
+    );
+  }
+
+  prepareCurrencySell(input: {
+    secretPhrase: string;
+    currency: string;
+    rateNQT: string | number | bigint;
+    units: string | number | bigint;
+    feeArkos?: string | number;
+    deadline?: number;
+  }, options?: RequestOptions): Promise<PreparedTransaction> {
+    const currency = BigInt(input.currency).toString();
+    const rateNQT = BigInt(input.rateNQT).toString();
+    const units = BigInt(input.units).toString();
+    if (BigInt(rateNQT) <= 0n || BigInt(units) <= 0n) {
+      throw new RangeError("Exchange rate and units must be positive.");
+    }
+    return this.prepareMonetaryTransaction(
+      "currencySell", 6, input.secretPhrase,
+      { currency, rateNQT, units },
+      { currency, rateNQT, units },
+      input.feeArkos, input.deadline, options,
+    );
+  }
+
+  prepareCurrencyMint(input: {
+    secretPhrase: string;
+    currency: string;
+    nonce: string | number | bigint;
+    units: string | number | bigint;
+    counter: string | number | bigint;
+    feeArkos?: string | number;
+    deadline?: number;
+  }, options?: RequestOptions): Promise<PreparedTransaction> {
+    const currency = BigInt(input.currency).toString();
+    const nonce = BigInt(input.nonce).toString();
+    const units = BigInt(input.units).toString();
+    const counter = BigInt(input.counter).toString();
+    if ([currency, nonce, units, counter].some((v) => BigInt(v) < 0n) || BigInt(units) === 0n) {
+      throw new RangeError("Mint values must be unsigned and units must be positive.");
+    }
+    return this.prepareMonetaryTransaction(
+      "currencyMint", 7, input.secretPhrase,
+      { currency, nonce, units, counter },
+      { currency, nonce, units, counter },
+      input.feeArkos, input.deadline, options,
+    );
+  }
+
+  prepareCurrencyIssuance(input: {
+    secretPhrase: string;
+    name: string;
+    code: string;
+    description?: string;
+    type: number;
+    initialSupply: string | number | bigint;
+    reserveSupply: string | number | bigint;
+    maxSupply: string | number | bigint;
+    issuanceHeight?: number;
+    minReservePerUnitNQT?: string | number | bigint;
+    minDifficulty?: number;
+    maxDifficulty?: number;
+    ruleset?: number;
+    algorithm?: number;
+    decimals: number;
+    feeArkos?: string | number;
+    deadline?: number;
+  }, options?: RequestOptions): Promise<PreparedTransaction> {
+    const description = input.description ?? "";
+    const issuance = {
+      name: input.name,
+      code: input.code.toUpperCase(),
+      description,
+      currencyType: input.type,
+      initialSupply: BigInt(input.initialSupply).toString(),
+      reserveSupply: BigInt(input.reserveSupply).toString(),
+      maxSupply: BigInt(input.maxSupply).toString(),
+      issuanceHeight: input.issuanceHeight ?? 0,
+      minReservePerUnitNQT: BigInt(input.minReservePerUnitNQT ?? 0).toString(),
+      minDifficulty: input.minDifficulty ?? 0,
+      maxDifficulty: input.maxDifficulty ?? 0,
+      ruleset: input.ruleset ?? 0,
+      algorithm: input.algorithm ?? 0,
+      decimals: input.decimals,
+    };
+    if (!/^[a-z0-9]{3,10}$/.test(issuance.name)) {
+      throw new TypeError("Currency name must contain 3–10 lowercase letters or digits.");
+    }
+    if (!/^[A-Z]{3,5}$/.test(issuance.code)) {
+      throw new TypeError("Currency code must contain 3–5 uppercase letters.");
+    }
+    if (issuance.decimals < 0 || issuance.decimals > 8) {
+      throw new RangeError("Currency decimals must be between 0 and 8.");
+    }
+    return this.prepareMonetaryTransaction(
+      "issueCurrency", 0, input.secretPhrase,
+      {
+        name: issuance.name,
+        code: issuance.code,
+        description,
+        type: issuance.currencyType,
+        initialSupply: issuance.initialSupply,
+        reserveSupply: issuance.reserveSupply,
+        maxSupply: issuance.maxSupply,
+        issuanceHeight: issuance.issuanceHeight,
+        minReservePerUnitNQT: issuance.minReservePerUnitNQT,
+        minDifficulty: issuance.minDifficulty,
+        maxDifficulty: issuance.maxDifficulty,
+        ruleset: issuance.ruleset,
+        algorithm: issuance.algorithm,
+        decimals: issuance.decimals,
+      },
+      { issuance },
+      input.feeArkos, input.deadline, options,
+    );
+  }
+
+  async buyCurrency(input: Parameters<ArkoviaClient["prepareCurrencyBuy"]>[0], options?: RequestOptions): Promise<SubmittedTransaction> {
+    return this.signAndBroadcast(await this.prepareCurrencyBuy(input, options), input.secretPhrase, options);
+  }
+
+  async sellCurrency(input: Parameters<ArkoviaClient["prepareCurrencySell"]>[0], options?: RequestOptions): Promise<SubmittedTransaction> {
+    return this.signAndBroadcast(await this.prepareCurrencySell(input, options), input.secretPhrase, options);
+  }
+
+  async submitCurrencyMint(input: Parameters<ArkoviaClient["prepareCurrencyMint"]>[0], options?: RequestOptions): Promise<SubmittedTransaction> {
+    return this.signAndBroadcast(await this.prepareCurrencyMint(input, options), input.secretPhrase, options);
+  }
+
+  async issueCurrency(input: Parameters<ArkoviaClient["prepareCurrencyIssuance"]>[0], options?: RequestOptions): Promise<SubmittedTransaction> {
+    return this.signAndBroadcast(await this.prepareCurrencyIssuance(input, options), input.secretPhrase, options);
+  }
+
   getMintingTarget(
     query: { currency: string; account: string; units: string | number | bigint },
     options?: RequestOptions,

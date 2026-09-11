@@ -173,6 +173,51 @@ const transfer = await arkovia.transferCurrency({
 
 These initial high-level write methods intentionally reject appendices, referenced transactions, mismatched senders, changed recipients, changed amounts, changed fees, and unexpected attachments. Additional transaction types will be enabled only after their byte layouts are independently verified.
 
+## Monetary System writes
+
+Currency operations use the same prepare, verify, locally sign, and broadcast pipeline as ARKOS payments.
+
+```ts
+await arkovia.buyCurrency({
+  secretPhrase,
+  currency: "CURRENCY_ID",
+  rateNQT: "2500000",
+  units: "100",
+});
+
+await arkovia.sellCurrency({
+  secretPhrase,
+  currency: "CURRENCY_ID",
+  rateNQT: "3000000",
+  units: "50",
+});
+
+await arkovia.submitCurrencyMint({
+  secretPhrase,
+  currency: "CURRENCY_ID",
+  nonce: "987654321",
+  units: "10",
+  counter: "4",
+});
+
+await arkovia.issueCurrency({
+  secretPhrase,
+  name: "example",
+  code: "EXM",
+  type: 5,
+  initialSupply: "1000000",
+  reserveSupply: "0",
+  maxSupply: "10000000",
+  minDifficulty: 1,
+  maxDifficulty: 255,
+  ruleset: 0,
+  algorithm: 5,
+  decimals: 2,
+});
+```
+
+Values ending in `NQT` are atomic ARKOS amounts. Currency supply and unit values are expressed in the currency's smallest units. Applications should display a complete confirmation screen before calling any method that signs and broadcasts.
+
 ## API methods
 
 ### Network and blocks
@@ -228,7 +273,7 @@ npm run build
 - [x] Verified unsigned ARKOS and currency-transfer preparation
 - [x] Core deterministic local signing and signature verification
 - [x] Signed-transaction broadcasting
-- [ ] Currency issuance, exchange, and mint submission
+- [x] Currency issuance, exchange, and mint submission
 - [ ] Browser wallet adapters
 - [ ] npm publication
 

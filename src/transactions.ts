@@ -33,6 +33,25 @@ export interface TransactionIntent {
   deadline: number;
   currency?: string;
   units?: string | bigint;
+  rateNQT?: string | bigint;
+  nonce?: string | bigint;
+  counter?: string | bigint;
+  issuance?: {
+    name: string;
+    code: string;
+    description: string;
+    currencyType: number;
+    initialSupply: string | bigint;
+    reserveSupply: string | bigint;
+    maxSupply: string | bigint;
+    issuanceHeight: number;
+    minReservePerUnitNQT: string | bigint;
+    minDifficulty: number;
+    maxDifficulty: number;
+    ruleset: number;
+    algorithm: number;
+    decimals: number;
+  };
 }
 
 export interface SignedTransaction {
@@ -116,11 +135,83 @@ export function parseTransactionHeader(
   };
 }
 
+
+function attachmentOffset(version: number): number {
+  return version > 0 ? TRANSACTION_HEADER_BYTES + 1 : 160;
+}
+
+function readExchangeAttachment(
+  bytes: Uint8Array,
+  version: number,
+): { currency: string; rateNQT: string; units: string } {
+  const offset = attachmentOffset(version);
+  assertBounds(bytes, offset, 24);
+  return {
+    currency: readU64LE(bytes, offset).toString(),
+    rateNQT: readU64LE(bytes, offset + 8).toString(),
+    units: readU64LE(bytes, offset + 16).toString(),
+  };
+}
+
+function readMintAttachment(
+  bytes: Uint8Array,
+  version: number,
+): { currency: string; nonce: string; units: string; counter: string } {
+  const offset = attachmentOffset(version);
+  assertBounds(bytes, offset, 32);
+  return {
+    currency: readU64LE(bytes, offset).toString(),
+    nonce: readU64LE(bytes, offset + 8).toString(),
+    units: readU64LE(bytes, offset + 16).toString(),
+    counter: readU64LE(bytes, offset + 24).toString(),
+  };
+}
+
+function readText(bytes: Uint8Array, offset: number, length: number): string {
+  assertBounds(bytes, offset, length);
+  return new TextDecoder("utf-8", { fatal: true }).decode(
+    bytes.slice(offset, offset + length),
+  );
+}
+
+function readIssuanceAttachment(bytes: Uint8Array, version: number) {
+  let offset = attachmentOffset(version);
+  const nameLength = bytes[offset++]!;
+  const name = readText(bytes, offset, nameLength);
+  offset += nameLength;
+  const codeLength = bytes[offset++]!;
+  const code = readText(bytes, offset, codeLength);
+  offset += codeLength;
+  const descriptionLength = readU16LE(bytes, offset);
+  offset += 2;
+  const description = readText(bytes, offset, descriptionLength);
+  offset += descriptionLength;
+  assertBounds(bytes, offset, 45);
+  const result = {
+    name,
+    code,
+    description,
+    currencyType: bytes[offset++]!,
+    initialSupply: readU64LE(bytes, offset).toString(),
+    reserveSupply: readU64LE(bytes, offset + 8).toString(),
+    maxSupply: readU64LE(bytes, offset + 16).toString(),
+    issuanceHeight: readU32LE(bytes, offset + 24),
+    minReservePerUnitNQT: readU64LE(bytes, offset + 28).toString(),
+    minDifficulty: bytes[offset + 36]!,
+    maxDifficulty: bytes[offset + 37]!,
+    ruleset: bytes[offset + 38]!,
+    algorithm: bytes[offset + 39]!,
+    decimals: bytes[offset + 40]!,
+  };
+  offset += 41;
+  return { ...result, endOffset: offset };
+}
+
 function readCurrencyAttachment(
   bytes: Uint8Array,
   version: number,
 ): { currency: string; units: string } {
-  const offset = version > 0 ? TRANSACTION_HEADER_BYTES + 1 : 160;
+  const offset = attachmentOffset(version);
   assertBounds(bytes, offset, 16);
   return {
     currency: readU64LE(bytes, offset).toString(),
@@ -147,13 +238,57 @@ export function verifyUnsignedTransaction(
   if (!allZero(bytes.slice(SIGNATURE_OFFSET, SIGNATURE_OFFSET + SIGNATURE_BYTES))) failures.push("signature");
   if (parsed.flags !== 0) failures.push("appendix flags");
 
-  if (intent.currency !== undefined || intent.units !== undefined) {
+  if (intent.issuance) {
+    if (parsed.type !== 5 || parsed.subtype !== 0) {
+      failures.push("currency issuance type");
+    } else {
+      const actual = readIssuanceAttachment(bytes, parsed.version);
+      const expected = intent.issuance;
+      if (actual.name !== expected.name) failures.push("name");
+      if (actual.code !== expected.code) failures.push("code");
+      if (actual.description !== expected.description) failures.push("description");
+      if (actual.currencyType !== expected.currencyType) failures.push("currencyType");
+      if (actual.initialSupply !== BigInt(expected.initialSupply).toString()) failures.push("initialSupply");
+      if (actual.reserveSupply !== BigInt(expected.reserveSupply).toString()) failures.push("reserveSupply");
+      if (actual.maxSupply !== BigInt(expected.maxSupply).toString()) failures.push("maxSupply");
+      if (actual.issuanceHeight !== expected.issuanceHeight) failures.push("issuanceHeight");
+      if (actual.minReservePerUnitNQT !== BigInt(expected.minReservePerUnitNQT).toString()) failures.push("minReservePerUnitNQT");
+      if (actual.minDifficulty !== expected.minDifficulty) failures.push("minDifficulty");
+      if (actual.maxDifficulty !== expected.maxDifficulty) failures.push("maxDifficulty");
+      if (actual.ruleset !== expected.ruleset) failures.push("ruleset");
+      if (actual.algorithm !== expected.algorithm) failures.push("algorithm");
+      if (actual.decimals !== expected.decimals) failures.push("decimals");
+      if (actual.endOffset !== bytes.length) failures.push("unexpected issuance bytes");
+    }
+  } else if (intent.rateNQT !== undefined) {
+    if (parsed.type !== 5 || (parsed.subtype !== 5 && parsed.subtype !== 6)) {
+      failures.push("currency exchange type");
+    } else {
+      const attachment = readExchangeAttachment(bytes, parsed.version);
+      if (attachment.currency !== BigInt(intent.currency ?? 0).toString()) failures.push("currency");
+      if (attachment.rateNQT !== BigInt(intent.rateNQT).toString()) failures.push("rateNQT");
+      if (attachment.units !== BigInt(intent.units ?? 0).toString()) failures.push("units");
+      if (attachmentOffset(parsed.version) + 24 !== bytes.length) failures.push("unexpected exchange bytes");
+    }
+  } else if (intent.nonce !== undefined || intent.counter !== undefined) {
+    if (parsed.type !== 5 || parsed.subtype !== 7) {
+      failures.push("currency mint type");
+    } else {
+      const attachment = readMintAttachment(bytes, parsed.version);
+      if (attachment.currency !== BigInt(intent.currency ?? 0).toString()) failures.push("currency");
+      if (attachment.nonce !== BigInt(intent.nonce ?? 0).toString()) failures.push("nonce");
+      if (attachment.units !== BigInt(intent.units ?? 0).toString()) failures.push("units");
+      if (attachment.counter !== BigInt(intent.counter ?? 0).toString()) failures.push("counter");
+      if (attachmentOffset(parsed.version) + 32 !== bytes.length) failures.push("unexpected mint bytes");
+    }
+  } else if (intent.currency !== undefined || intent.units !== undefined) {
     if (parsed.type !== 5 || parsed.subtype !== 3) {
       failures.push("currency transaction type");
     } else {
       const attachment = readCurrencyAttachment(bytes, parsed.version);
       if (attachment.currency !== BigInt(intent.currency ?? 0).toString()) failures.push("currency");
       if (attachment.units !== BigInt(intent.units ?? 0).toString()) failures.push("units");
+      if (attachmentOffset(parsed.version) + 16 !== bytes.length) failures.push("unexpected transfer bytes");
     }
   } else if (bytes.length !== TRANSACTION_HEADER_BYTES) {
     failures.push("unexpected attachment");
