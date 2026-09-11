@@ -74,10 +74,11 @@ export async function signBytes(
   const secretDigest = await sha256(encoder.encode(secretPhrase));
   const signingKey = curve25519.keygen(curveArray(secretDigest)).s;
   const messageDigest = await sha256(messageBytes);
-  const x = await sha256(messageDigest, asUint8(signingKey));
-  const y = curve25519.keygen(curveArray(x)).p;
+  // keygen clamps x in place; the mutated scalar must also be passed to sign.
+  const x = curveArray(await sha256(messageDigest, asUint8(signingKey)));
+  const y = curve25519.keygen(x).p;
   const h = await sha256(messageDigest, asUint8(y));
-  const v = curve25519.sign(curveArray(h), curveArray(x), signingKey);
+  const v = curve25519.sign(curveArray(h), x, signingKey);
   if (!v) throw new Error("Curve25519 could not produce a signature.");
   return bytesToHex(concatBytes(asUint8(v), h));
 }
