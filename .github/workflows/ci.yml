@@ -19,7 +19,9 @@ jobs:
         with:
           node-version: 24
       - name: Install dependencies
-        run: npm install
+        run: npm ci
+      - name: Audit production dependency tree
+        run: npm audit --omit=dev --audit-level=high
       - name: Type-check
         run: npm run typecheck
       - name: Test
