@@ -1,3 +1,12 @@
+export {
+  getAccountAddress,
+  getAccountId,
+  getAccountIdFromPublicKey,
+  getPublicKey,
+  signBytes,
+  verifySignature,
+} from "./crypto/arkoviaCrypto.js";
+export { bytesToHex, hexToBytes } from "./crypto/bytes.js";
 export { ArkoviaClient } from "./client.js";
 export {
   ArkoviaError,

@@ -127,6 +127,29 @@ const valid = isValidArkoviaAddress(address);
 
 Address decoding performs the complete Reed–Solomon checksum validation used by Arkovia. Numeric account IDs are restricted to the unsigned 64-bit range.
 
+## Local cryptography
+
+Secret phrases remain in the calling application and are never sent to an Arkovia node by these functions.
+
+```ts
+import {
+  getPublicKey,
+  getAccountId,
+  getAccountAddress,
+  signBytes,
+  verifySignature,
+} from "@arkovia/sdk";
+
+const publicKey = await getPublicKey(secretPhrase);
+const accountId = await getAccountId(secretPhrase);
+const address = await getAccountAddress(secretPhrase);
+
+const signature = await signBytes(unsignedTransactionHex, secretPhrase);
+const valid = await verifySignature(signature, unsignedTransactionHex, publicKey);
+```
+
+`signBytes` is a low-level primitive. Do not sign transaction bytes from an untrusted node until the transaction fields have been independently parsed and checked. A safe transaction parser and builder are the next SDK milestone.
+
 ## API methods
 
 ### Network and blocks
@@ -180,7 +203,7 @@ npm run build
 - [x] Minting-target lookup
 - [x] Full Reed-Solomon address checksum validation
 - [ ] Transaction byte construction
-- [ ] Secure local transaction signing
+- [x] Core deterministic local signing and signature verification
 - [ ] Transaction broadcasting
 - [ ] Currency issuance, transfer, exchange, and mint submission
 - [ ] Browser wallet adapters
