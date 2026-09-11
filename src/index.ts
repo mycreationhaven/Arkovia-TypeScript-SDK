@@ -32,3 +32,16 @@ export {
   looksLikeArkoviaAddress,
 } from "./utils/account.js";
 export type * from "./types.js";
+export {
+  SIGNATURE_BYTES,
+  SIGNATURE_OFFSET,
+  TRANSACTION_HEADER_BYTES,
+  parseTransactionHeader,
+  signTransactionBytes,
+  verifyUnsignedTransaction,
+} from "./transactions.js";
+export type {
+  ParsedTransactionHeader,
+  SignedTransaction,
+  TransactionIntent,
+} from "./transactions.js";

@@ -150,6 +150,29 @@ const valid = await verifySignature(signature, unsignedTransactionHex, publicKey
 
 `signBytes` is a low-level primitive. Do not sign transaction bytes from an untrusted node until the transaction fields have been independently parsed and checked. A safe transaction parser and builder are the next SDK milestone.
 
+## Safe payments and currency transfers
+
+The SDK requests unsigned bytes, independently checks the critical fields, signs locally, and broadcasts only the signed bytes.
+
+```ts
+const payment = await arkovia.sendArkos({
+  secretPhrase,
+  recipient: "ARK-XXXX-XXXX-XXXX-XXXXX",
+  amountArkos: "1.25",
+  feeArkos: "0.01",
+});
+
+const transfer = await arkovia.transferCurrency({
+  secretPhrase,
+  recipient: "ARK-XXXX-XXXX-XXXX-XXXXX",
+  currency: "CURRENCY_ID",
+  units: "100",
+  feeArkos: "0.01",
+});
+```
+
+These initial high-level write methods intentionally reject appendices, referenced transactions, mismatched senders, changed recipients, changed amounts, changed fees, and unexpected attachments. Additional transaction types will be enabled only after their byte layouts are independently verified.
+
 ## API methods
 
 ### Network and blocks
@@ -202,10 +225,10 @@ npm run build
 - [x] Account format helpers
 - [x] Minting-target lookup
 - [x] Full Reed-Solomon address checksum validation
-- [ ] Transaction byte construction
+- [x] Verified unsigned ARKOS and currency-transfer preparation
 - [x] Core deterministic local signing and signature verification
-- [ ] Transaction broadcasting
-- [ ] Currency issuance, transfer, exchange, and mint submission
+- [x] Signed-transaction broadcasting
+- [ ] Currency issuance, exchange, and mint submission
 - [ ] Browser wallet adapters
 - [ ] npm publication
 

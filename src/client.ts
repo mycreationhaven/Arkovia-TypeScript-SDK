@@ -19,8 +19,18 @@ import type {
   PaginatedTransactions,
   RequestOptions,
   Transaction,
+  UnsignedTransactionResponse,
+  BroadcastTransactionResponse,
+  PreparedTransaction,
+  SubmittedTransaction,
 } from "./types.js";
-import { assertAccountIdentifier } from "./utils/account.js";
+import { addressToAccountId, assertAccountIdentifier, isNumericAccountId } from "./utils/account.js";
+import { arkosToAtomic, assertMinimumTransactionFee } from "./utils/amount.js";
+import { getPublicKey } from "./crypto/arkoviaCrypto.js";
+import {
+  signTransactionBytes,
+  verifyUnsignedTransaction,
+} from "./transactions.js";
 
 const DEFAULT_TIMEOUT_MS = 12_000;
 
@@ -252,6 +262,149 @@ export class ArkoviaClient {
       { currency, ...query },
       options,
     );
+  }
+
+  async prepareArkosPayment(input: {
+    secretPhrase: string;
+    recipient: string;
+    amountArkos: string | number;
+    feeArkos?: string | number;
+    deadline?: number;
+  }, options?: RequestOptions): Promise<PreparedTransaction> {
+    const recipient = assertAccountIdentifier(input.recipient);
+    const recipientId = isNumericAccountId(recipient)
+      ? recipient
+      : addressToAccountId(recipient);
+    const amountNQT = arkosToAtomic(input.amountArkos).toString();
+    const feeNQT = assertMinimumTransactionFee(input.feeArkos ?? "0.01").toString();
+    const deadline = input.deadline ?? 1440;
+    const publicKey = await getPublicKey(input.secretPhrase);
+
+    const response = await this.request<UnsignedTransactionResponse>(
+      "sendMoney",
+      { recipient, amountNQT, feeNQT, deadline, publicKey, broadcast: false },
+      options,
+    );
+    if (!response.unsignedTransactionBytes) {
+      throw new ArkoviaError("Node did not return unsigned transaction bytes.", {
+        response,
+      });
+    }
+    verifyUnsignedTransaction(response.unsignedTransactionBytes, {
+      type: 0,
+      subtype: 0,
+      senderPublicKey: publicKey,
+      recipient: recipientId,
+      amountNQT,
+      feeNQT,
+      deadline,
+    });
+    return {
+      unsignedTransactionBytes: response.unsignedTransactionBytes,
+      ...(response.transactionJSON
+        ? { transactionJSON: response.transactionJSON }
+        : {}),
+    };
+  }
+
+  async prepareCurrencyTransfer(input: {
+    secretPhrase: string;
+    recipient: string;
+    currency: string;
+    units: string | number | bigint;
+    feeArkos?: string | number;
+    deadline?: number;
+  }, options?: RequestOptions): Promise<PreparedTransaction> {
+    const recipient = assertAccountIdentifier(input.recipient);
+    const recipientId = isNumericAccountId(recipient)
+      ? recipient
+      : addressToAccountId(recipient);
+    const currency = BigInt(input.currency).toString();
+    const units = BigInt(input.units).toString();
+    if (BigInt(units) <= 0n) throw new RangeError("Currency units must be positive.");
+    const feeNQT = assertMinimumTransactionFee(input.feeArkos ?? "0.01").toString();
+    const deadline = input.deadline ?? 1440;
+    const publicKey = await getPublicKey(input.secretPhrase);
+
+    const response = await this.request<UnsignedTransactionResponse>(
+      "transferCurrency",
+      { recipient, currency, units, feeNQT, deadline, publicKey, broadcast: false },
+      options,
+    );
+    if (!response.unsignedTransactionBytes) {
+      throw new ArkoviaError("Node did not return unsigned transaction bytes.", {
+        response,
+      });
+    }
+    verifyUnsignedTransaction(response.unsignedTransactionBytes, {
+      type: 5,
+      subtype: 3,
+      senderPublicKey: publicKey,
+      recipient: recipientId,
+      amountNQT: "0",
+      feeNQT,
+      deadline,
+      currency,
+      units,
+    });
+    return {
+      unsignedTransactionBytes: response.unsignedTransactionBytes,
+      ...(response.transactionJSON
+        ? { transactionJSON: response.transactionJSON }
+        : {}),
+    };
+  }
+
+  broadcastTransaction(
+    transactionBytes: string,
+    options?: RequestOptions,
+  ): Promise<BroadcastTransactionResponse> {
+    return this.request("broadcastTransaction", { transactionBytes }, options);
+  }
+
+  async sendArkos(input: {
+    secretPhrase: string;
+    recipient: string;
+    amountArkos: string | number;
+    feeArkos?: string | number;
+    deadline?: number;
+  }, options?: RequestOptions): Promise<SubmittedTransaction> {
+    const prepared = await this.prepareArkosPayment(input, options);
+    const signed = await signTransactionBytes(
+      prepared.unsignedTransactionBytes,
+      input.secretPhrase,
+    );
+    const broadcast = await this.broadcastTransaction(signed.transactionBytes, options);
+    return {
+      transaction: broadcast.transaction,
+      fullHash: broadcast.fullHash,
+      transactionBytes: signed.transactionBytes,
+      locallyCalculatedTransaction: signed.transactionId,
+      locallyCalculatedFullHash: signed.fullHash,
+    };
+  }
+
+  async transferCurrency(input: {
+    secretPhrase: string;
+    recipient: string;
+    currency: string;
+    units: string | number | bigint;
+    feeArkos?: string | number;
+    deadline?: number;
+  }, options?: RequestOptions): Promise<SubmittedTransaction> {
+    const prepared = await this.prepareCurrencyTransfer(input, options);
+    const signed = await signTransactionBytes(
+      prepared.unsignedTransactionBytes,
+      input.secretPhrase,
+    );
+    const broadcast = await this.broadcastTransaction(signed.transactionBytes, options);
+    return {
+      transaction: broadcast.transaction,
+      fullHash: broadcast.fullHash,
+      transactionBytes: signed.transactionBytes,
+      locallyCalculatedTransaction: signed.transactionId,
+      locallyCalculatedFullHash: signed.fullHash,
+    };
   }
 
   getMintingTarget(

@@ -131,3 +131,29 @@ export interface CurrencyTransfers {
   transfers: Array<Record<string, unknown>>;
   [key: string]: unknown;
 }
+
+export interface UnsignedTransactionResponse {
+  unsignedTransactionBytes: string;
+  transactionJSON?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface BroadcastTransactionResponse {
+  transaction: string;
+  fullHash: string;
+  transactionBytes?: string;
+  [key: string]: unknown;
+}
+
+export interface PreparedTransaction {
+  unsignedTransactionBytes: string;
+  transactionJSON?: Record<string, unknown>;
+}
+
+export interface SubmittedTransaction {
+  transaction: string;
+  fullHash: string;
+  transactionBytes: string;
+  locallyCalculatedTransaction: string;
+  locallyCalculatedFullHash: string;
+}
