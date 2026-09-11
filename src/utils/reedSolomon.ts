@@ -83,7 +83,7 @@ export function decodeReedSolomon(
     throw new TypeError("Invalid Reed-Solomon address length.");
   }
 
-  const codeword = [...INITIAL_CODEWORD];
+  const codeword: number[] = [...INITIAL_CODEWORD];
   for (let i = 0; i < body.length; i += 1) {
     const alphabetPosition = ALPHABET.indexOf(body[i]!);
     if (alphabetPosition < 0) {
