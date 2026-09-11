@@ -13,7 +13,9 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "sideEffects": false,
   "engines": {
     "node": ">=18"
@@ -47,5 +49,6 @@
   "bugs": {
     "url": "https://github.com/mycreationhaven/Arkovia-TypeScript-SDK/issues"
   },
-  "homepage": "https://github.com/mycreationhaven/Arkovia-TypeScript-SDK#readme"
+  "homepage": "https://github.com/mycreationhaven/Arkovia-TypeScript-SDK#readme",
+  "license": "Apache-2.0"
 }

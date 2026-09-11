@@ -2,6 +2,8 @@
 
 Official TypeScript and JavaScript SDK for building applications on the Arkovia Blockchain—accounts, transactions, ARKOS, custom currencies, minting, and secure local signing.
 
+[Developer Center](https://arkovia.base44.app/developers) · [GitHub Repository](https://github.com/mycreationhaven/Arkovia-TypeScript-SDK)
+
 > **Status:** Early developer preview. The read-only API foundation is available. Transaction construction and local signing are planned for the next development phase.
 
 ## Features
@@ -172,6 +174,14 @@ npm run build
 
 Treat secret phrases and private keys as highly sensitive. Never commit them, log them, pass them in URLs, or send them to third-party nodes.
 
+## Developer resources
+
+- [Arkovia Developer Center](https://arkovia.base44.app/developers)
+- [Arkovia Blockchain source](https://github.com/mycreationhaven/Arkovia-Blockchain)
+- [SDK issues and feature requests](https://github.com/mycreationhaven/Arkovia-TypeScript-SDK/issues)
+
 ## License
 
-A project license has not yet been selected. Add an explicit license before publishing the package to npm.
+Copyright 2026 My Creation Haven™.
+
+Licensed under the [Apache License 2.0](./LICENSE).
