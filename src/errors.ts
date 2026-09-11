@@ -1,11 +1,11 @@
 export class ArkoviaError extends Error {
-  readonly code?: number;
-  readonly description?: string;
+  readonly code: number | undefined;
+  readonly description: string | undefined;
   readonly response?: unknown;
 
   constructor(message: string, options: {
-    code?: number;
-    description?: string;
+    code?: number | undefined;
+    description?: string | undefined;
     response?: unknown;
     cause?: unknown;
   } = {}) {
