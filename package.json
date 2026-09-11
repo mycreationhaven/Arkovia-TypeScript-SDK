@@ -1,0 +1,51 @@
+{
+  "name": "@arkovia/sdk",
+  "version": "0.1.0",
+  "description": "Official TypeScript and JavaScript SDK for the Arkovia Blockchain",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "keywords": [
+    "arkovia",
+    "arkos",
+    "blockchain",
+    "cryptocurrency",
+    "sdk",
+    "typescript",
+    "javascript"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mycreationhaven/Arkovia-TypeScript-SDK.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mycreationhaven/Arkovia-TypeScript-SDK/issues"
+  },
+  "homepage": "https://github.com/mycreationhaven/Arkovia-TypeScript-SDK#readme"
+}
