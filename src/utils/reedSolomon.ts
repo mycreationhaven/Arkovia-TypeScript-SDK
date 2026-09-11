@@ -48,7 +48,7 @@ export function encodeReedSolomon(
   }
 
   let remaining = value;
-  const codeword = [...INITIAL_CODEWORD];
+  const codeword: number[] = [...INITIAL_CODEWORD];
   let position = 0;
   do {
     codeword[position] = Number(remaining % 32n);
@@ -56,7 +56,7 @@ export function encodeReedSolomon(
     position += 1;
   } while (remaining > 0n);
 
-  const parity = [0, 0, 0, 0];
+  const parity: number[] = [0, 0, 0, 0];
   for (let i = 12; i >= 0; i -= 1) {
     const feedback = codeword[i]! ^ parity[3]!;
     parity[3] = parity[2]! ^ gmult(30, feedback);
